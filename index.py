@@ -22,7 +22,7 @@ def decryptAll():
     for i in range(offset, len(data), readingSize):
         current = data[i : i + readingSize]
         if len(current) != readingSize:
-            continue  # neispravan zapis
+            continue
         iv = current[0:16]
         encryptedText = current[16 : 16 + SIZE]
         tag = current[16 + SIZE : 16 + SIZE + 16]
