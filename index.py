@@ -1,7 +1,5 @@
-from re import A
 import sys
 from Crypto.Cipher import AES
-from Crypto.Hash import SHA512
 from Crypto.Hash import HMAC, SHA256
 from Crypto.Protocol.KDF import scrypt
 from Crypto.Random import get_random_bytes
@@ -15,39 +13,42 @@ key = None
 
 
 def decryptAll():
-    readingSize = SIZE + 16 + 16  # encryptedText + iv + tag
     with open("collection.pass", "rb") as f:
         data = f.read()
     offset = 16 + 32  # salt + kdf
-    for i in range(offset, len(data), readingSize):
-        current = data[i : i + readingSize]
-        if len(current) != readingSize:
-            continue
-        iv = current[0:16]
-        encryptedText = current[16 : 16 + SIZE]
-        tag = current[16 + SIZE : 16 + SIZE + 16]
-        try:
-            cipher = AES.new(key, AES.MODE_GCM, iv)
-            decText = cipher.decrypt_and_verify(encryptedText, tag)
-            link = decText[2 : 2 + decText[0]].decode("ascii")
-            password = decText[2 + decText[0] : 2 + decText[0] + decText[1]].decode(
-                "ascii"
-            )
+    data = data[offset:]
+    if len(data) < (258 + 16 + 16):
+        print("Database empty or corrupted!")
+        return
+    iv = data[0:16]
+    tag = data[16:32]
+    encryptedText = data[32:]
+    if len(encryptedText) % SIZE != 0:
+        print("Data corrupted!")
+        return
+    try:
+        cipher = AES.new(key, AES.MODE_GCM, iv)
+        decText = cipher.decrypt_and_verify(encryptedText, tag)
+        for i in range(0, len(decText), SIZE):
+            link = decText[i + 2 : i + 2 + decText[i]].decode("ascii")
+            password = decText[
+                i + 2 + decText[i] : i + 2 + decText[i] + decText[i + 1]
+            ].decode("ascii")
             decrypted.append((link, password))
-        except Exception as e:
-            print(e)
+    except Exception as e:
+        print(e)
 
 
 def encryptAll():
     salt = get_random_bytes(16)  # Generate a random salt used for the key derivation
     key = scrypt(masterPassword, salt, 32, N=2**20, r=8, p=1)  # Key derivation
     MAC = HMAC.new(key, verifier_text, digestmod=SHA256)
-    cipher = AES.new(key, AES.MODE_GCM)
     with open("collection.pass", "wb") as f:
         f.write(salt)
         f.write(MAC.digest())
 
     # Constant size -> can't fint out lenght of the password
+    allData = bytes()
     for i in decrypted:
         toEncrypt = (
             len(i[0]).to_bytes(1, "big")  # Big endian (0x1234 ->(1)0x12 (2)0x34)
@@ -56,13 +57,15 @@ def encryptAll():
             + i[1].encode("ascii")
         )
         toEncrypt += get_random_bytes(SIZE - len(toEncrypt))  # Padding
+        allData += toEncrypt
 
-        iv = cipher.nonce
-        encryptedText, encryptedTag = cipher.encrypt_and_digest(toEncrypt)
-        with open("collection.pass", "ab") as f:
-            f.write(iv)
-            f.write(encryptedText)
-            f.write(encryptedTag)
+    cipher = AES.new(key, AES.MODE_GCM)
+    iv = cipher.nonce
+    encryptedText, encryptedTag = cipher.encrypt_and_digest(allData)
+    with open("collection.pass", "ab") as f:
+        f.write(iv)
+        f.write(encryptedTag)
+        f.write(encryptedText)
 
 
 def init():

@@ -1,0 +1,24 @@
+Baza podataka -> text file
+
+Prevođenje:
+Potrebno je imati instaliran python3 i vanjsku biblioteku pycryptodome.
+Ukoliko vanjska bibliteka nije instalirana:
+```
+pip3 install pycryptodome
+```
+Daljnje upute su u uputama za korištenje ispod. Postoji (--help) pri pokretanju programa.
+
+Naredbe za korištenje su iste kao i uputama:
+Inicijalizacija baze - python3 ./index.py init {Master Password} -> Inicijalizira bazu podataka (ako već postoji prepisuje preko nje)
+Dodavanje novog zapisa - python3 ./index.py put {Master Password} {Website link} {Password} -> Dodaje novi zapis u bazu podataka (ako već postoji zapis za isti website mijenja staru zaporku u novu)
+Dohvaćanje zapisa - python3 ./index.py get {Master Password} {Website link} -> Dohvaća zapis iz baze podataka
+
+Opis rada programa:
+
+[16B(salt) + 32B(verifikacijski teksta)]
+Pri inicijalizaciji baze podataka u datoteku se sprema HMAC izračunat pomoću ključa i konstantog verifikacijskog teksta. Ključ je izračunat iz nasumičnog salta i {Master Passworda}. Također se u datoteku sprema i taj nasumični salt kako bi onda pri provjeri {Master Password} mogli izračunati verifikacijski teksta ponovo i provjeriti. Ako je {Master Password} kriv onda će se pri derivaciji ključa dobiti vrijednost koja neće moći pomoći učitanog salt-a izračunati verifikacijski teksta i znamo da je onda krivi {Master Password}. Također nikakav daljni proces enkripcije/dekripcije neće krenuti ako je krivi {Master Password}
+
+[16B(inicijalizacijski vektor) + 16B(tag) + x(broj zaporki) * 258B(Website link + Password + padding)]
+Pri postavljanju/mijenjanju zaporke šifriramo {Password} i {Website link} zajedno + zapisujemo 1B(duljina zaporke/linka do 128 znakova) koji predstavlja duljinu linka + zapisujemo 1B koji predstavlja duljinu zaporke + dodajemo padding tako da je svaki zapis u bazi jednake duljine. Sve zaporke u bazi onda zajedno sifriramo u jedan ciphertext koji je zasticen derivatom kljuca iz {Master Password} (svako pokretanje novim) te svaki put novim inicijalizacijskim vektorom. Time zapravo napadac ne moze znati nikako na kojoj se lokaciji nalazi sifra jedino sta moze odrediti je koliko je zaporki spremljeno. Takoder ne može nikako promjeniti dvije zaporke ili dodati novu jer se uz cijeli šifrat dodaje i vefifikacijski tag koji treba provjeriti u AES-GCM načinu rada.
+
+Za dobivanje zapisane zaporke iz datoteke iz zapisanog inicijalizacijskog vektora i ponovnog derivata zaporke dekriptiramo cijelu bazu i onda po zapisima iz prva dva bajta svakih(258 bajtova) određujemo {Website link} i {Password} te ponovo šifriramo cijelu bazu na istom principu kao i prije.
