@@ -18,7 +18,7 @@ def decryptAll():
     offset = 16 + 32  # salt + kdf
     data = data[offset:]
     if len(data) < (258 + 16 + 16):
-        print("Database empty or corrupted!")
+        # print("Database empty or corrupted!")
         return
     iv = data[0:16]
     tag = data[16:32]
