@@ -86,7 +86,7 @@ def checkMasterPassword():
         stored_salt = f.read(SALT_SIZE)
         stored_verifier = f.read(SHA256.digest_size)
 
-    key = scrypt(masterPassword, stored_salt, 32, N=2**20, r=8, p=1)
+    key = scrypt(masterPassword, stored_salt, 32, N=2**14, r=8, p=1)
     MAC = HMAC.new(key, verifier_text, digestmod=SHA256)
     if MAC.digest() == stored_verifier:
         decryptAll()
